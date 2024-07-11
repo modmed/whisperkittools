@@ -87,6 +87,11 @@ def cli():
         action="store_true",
         help=f"If specified, uplaods the generated models to hf.co/{MODEL_REPO_ID}"
     )
+    parser.add_argument(
+        "--keep-mlpackage",
+        action="store_true",
+        help="If specified, also keeps .mlpackage alongside the commpiled versions."
+    )
 
     # Alias the CLI args to match the test scripts
     args = parser.parse_args()
