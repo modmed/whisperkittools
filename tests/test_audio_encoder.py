@@ -21,6 +21,7 @@ torch.set_grad_enabled(False)
 logger = get_logger(__name__)
 
 TEST_WHISPER_VERSION = os.getenv("TEST_WHISPER_VERSION", None) or "openai/whisper-tiny"
+TEST_LOCAL_MODEL = os.getenv("TEST_LOCAL_MODEL", None)
 TEST_CACHE_DIR = os.getenv("TEST_CACHE_DIR", None) or "/tmp"
 TEST_DEV = os.getenv("TEST_DEV", None) or get_fastest_device()
 TEST_TORCH_DTYPE = torch.float32
@@ -32,6 +33,8 @@ argmaxtools_test_utils.TEST_MIN_SPEEDUP_VS_CPU = 0.95
 # TEST_N_MELS = [80, 128]
 TEST_N_SAMPLES = 480000  # 16kHz * 30s
 
+def whisperModel():
+    return TEST_LOCAL_MODEL if TEST_LOCAL_MODEL is not None else TEST_WHISPER_VERSION
 
 class TestWhisperAudioEncoder(
     argmaxtools_test_utils.CoreMLTestsMixin, unittest.TestCase
@@ -47,7 +50,7 @@ class TestWhisperAudioEncoder(
         # Original model
         orig_torch_model = (
             modeling_whisper.WhisperForConditionalGeneration.from_pretrained(
-                TEST_WHISPER_VERSION,
+                whisperModel(),
                 torch_dtype=TEST_TORCH_DTYPE,
             )
         )
@@ -133,14 +136,23 @@ class TestWhisperMelSpectrogram(
 
     @classmethod
     def setUpClass(cls):
-        with open(
-            hf_hub_download(repo_id=TEST_WHISPER_VERSION, filename="config.json"), "r"
-        ) as f:
-            n_mels = json.load(f)["num_mel_bins"]
+        if TEST_LOCAL_MODEL is not None:
+            path = os.path.join(TEST_LOCAL_MODEL, "config.json")
+            with open(path, "r") as f:
+                n_mels = json.load(f)["num_mel_bins"]
+            logger.info(
+                f"WhisperMelSpectrogram: n_mels={n_mels} for {TEST_LOCAL_MODEL}"
+            )
+        else:
+            with open(
+                hf_hub_download(repo_id=TEST_WHISPER_VERSION, filename="config.json"), "r"
+            ) as f:
+                n_mels = json.load(f)["num_mel_bins"]
+            logger.info(
+                f"WhisperMelSpectrogram: n_mels={n_mels} for {TEST_WHISPER_VERSION}"
+            )
+                
 
-        logger.info(
-            f"WhisperMelSpectrogram: n_mels={n_mels} for {TEST_WHISPER_VERSION}"
-        )
         cls.model_name = "MelSpectrogram"
         cls.test_output_names = ["melspectrogram_features"]
         cls.test_cache_dir = TEST_CACHE_DIR
@@ -193,7 +205,7 @@ class TestWhisperAudioEncoderPalettizer(
         cls.model_name = "AudioEncoder"
         cls.output_names = ["encoder_output_embeds"]
         cls.palettizer = palettize.WhisperAudioEncoderPalettizer(
-            model_version=TEST_WHISPER_VERSION,
+            model_version=whisperModel(),
             cache_dir=os.path.join(
                 TEST_CACHE_DIR, "compression_artifacts", "AudioEncoder"
             ),
@@ -206,10 +218,13 @@ class TestWhisperAudioEncoderPalettizer(
 
 
 def main(args):
-    global TEST_WHISPER_VERSION, TEST_CACHE_DIR
+    global TEST_WHISPER_VERSION, TEST_CACHE_DIR, TEST_LOCAL_MODEL
 
     TEST_WHISPER_VERSION = args.test_model_version
     logger.info(f"Testing {TEST_WHISPER_VERSION}")
+    if args.local_model is not None:
+        logger.info(f"Using local model at {args.local_model}")
+        TEST_LOCAL_MODEL = args.local_model
 
     audio_encoder.SDPA_IMPL = getattr(_sdpa, args.sdpa_implementation)
     logger.info(f"Set SDPA implementation to: {audio_encoder.SDPA_IMPL}")
@@ -252,6 +267,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--persistent-cache-dir", default=None, type=str)
+    parser.add_argument("--local-model", type=str, help="Path to a local copy of a model.")
     parser.add_argument("--palettizer-tests", action="store_true")
     parser.add_argument("--disable-default-tests", action="store_true")
     parser.add_argument("--melspectrogram-tests", action="store_true")

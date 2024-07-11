@@ -39,6 +39,11 @@ def cli():
              "e.g. openai/whisper-tiny.en",
     )
     parser.add_argument(
+        "--local-model",
+        type=str,
+        help="Path to a local copy of a model."
+    )
+    parser.add_argument(
         "--generate-quantized-variants",
         action="store_true",
         help="If specified, generates several variants of the model with varying bit precision"

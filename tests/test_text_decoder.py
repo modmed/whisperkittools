@@ -27,6 +27,7 @@ logger = get_logger(__name__)
 TEST_WHISPER_VERSION = (
     os.getenv("TEST_WHISPER_VERSION", None) or "openai/whisper-tiny"
 )  # tiny"
+TEST_LOCAL_MODEL = os.getenv("TEST_LOCAL_MODEL", None)
 TEST_DEV = os.getenv("TEST_DEV", None) or get_fastest_device()
 TEST_TORCH_DTYPE = torch.float32
 TEST_PSNR_THR = 35
@@ -41,6 +42,8 @@ TEST_CONTEXT_PREFILL_OUTPUT_NAMES = ["key_cache_prefill", "value_cache_prefill"]
 TEST_DEC_KV_SEQ_LEN = None
 TEST_TOKEN_TIMESTAMPS = True
 
+def whisperModel():
+    return TEST_LOCAL_MODEL if TEST_LOCAL_MODEL is not None else TEST_WHISPER_VERSION
 
 class TestWhisperTextDecoder(argmaxtools_test_utils.CoreMLTestsMixin, unittest.TestCase):
     @classmethod
@@ -55,7 +58,7 @@ class TestWhisperTextDecoder(argmaxtools_test_utils.CoreMLTestsMixin, unittest.T
         # Original model
         orig_torch_model = (
             modeling_whisper.WhisperForConditionalGeneration.from_pretrained(
-                TEST_WHISPER_VERSION,
+                whisperModel(),
                 torch_dtype=TEST_TORCH_DTYPE,
             )
         )
@@ -176,7 +179,7 @@ class TestWhisperTextDecoder(argmaxtools_test_utils.CoreMLTestsMixin, unittest.T
         - Test forward pass on WhisperDecoderContextPrefill
         """
         # Prepare additional inputs and utilities required for this test
-        str2id = AutoTokenizer.from_pretrained(TEST_WHISPER_VERSION).vocab
+        str2id = AutoTokenizer.from_pretrained(whisperModel()).vocab
         encoder_output_embeds_1 = torch.randn_like(
             self.test_torch_inputs["encoder_output_embeds"].expand(
                 TEST_BATCH, -1, -1, -1
@@ -357,7 +360,7 @@ class TestWhisperTextDecoderPalettizer(
             cls.output_names.pop("alignment_heads_weights")
 
         cls.palettizer = palettize.WhisperTextDecoderPalettizer(
-            model_version=TEST_WHISPER_VERSION,
+            model_version=whisperModel(),
             cache_dir=os.path.join(
                 TEST_CACHE_DIR, "compression_artifacts", "TextDecoder"
             ),
@@ -379,12 +382,15 @@ def place(t):
 
 
 def main(args):
-    global TEST_WHISPER_VERSION, TEST_CACHE_DIR, TEST_DEC_KV_SEQ_LEN, TEST_TOKEN_TIMESTAMPS
+    global TEST_WHISPER_VERSION, TEST_CACHE_DIR, TEST_DEC_KV_SEQ_LEN, TEST_TOKEN_TIMESTAMPS, TEST_LOCAL_MODEL
 
     TEST_WHISPER_VERSION = args.test_model_version
     TEST_TOKEN_TIMESTAMPS = not args.disable_token_timestamps
 
     logger.info(f"Testing {TEST_WHISPER_VERSION}")
+    if args.local_model is not None:
+        logger.info(f"Using local model at {args.local_model}")
+        TEST_LOCAL_MODEL = args.local_model
 
     text_decoder.SDPA_IMPL = getattr(_sdpa, args.sdpa_implementation)
     logger.info(f"Set SDPA implementation to: {text_decoder.SDPA_IMPL}")
@@ -430,6 +436,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--persistent-cache-dir", default=None, type=str)
+    parser.add_argument("--local-model", type=str, help="Path to a local copy of a model.")
     parser.add_argument("--palettizer-tests", action="store_true")
     parser.add_argument("--disable-default-tests", action="store_true")
     parser.add_argument("--context-prefill-tests", action="store_true")

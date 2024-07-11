@@ -41,6 +41,12 @@ conda create -n whisperkit python=3.11 -y && conda activate whisperkit
 cd WHISPERKIT_ROOT_DIR && pip install -e .
 ```
 
+- **Step 4:** Fixup environment
+```shell
+pip uninstall numpy
+pip install numpy==1.26.4
+```
+
 ## Model Generation
 Convert [Hugging Face Whisper Models](https://huggingface.co/models?search=whisper) (PyTorch) to [WhisperKit](https://github.com/argmaxinc/whisperkit) (Core ML) format:
 
