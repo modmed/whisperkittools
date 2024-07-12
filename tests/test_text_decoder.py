@@ -28,7 +28,6 @@ TEST_WHISPER_VERSION = (
     os.getenv("TEST_WHISPER_VERSION", None) or "openai/whisper-tiny"
 )  # tiny"
 TEST_LOCAL_MODEL = os.getenv("TEST_LOCAL_MODEL", None)
-TEST_KEEP_MLPACKAGE = False
 TEST_DEV = os.getenv("TEST_DEV", None) or get_fastest_device()
 TEST_TORCH_DTYPE = torch.float32
 TEST_PSNR_THR = 35
@@ -328,18 +327,6 @@ class TestWhisperTextDecoder(argmaxtools_test_utils.CoreMLTestsMixin, unittest.T
             argmaxtools_test_utils._save_coreml_asset(
                 self.test_coreml_model, TEST_CACHE_DIR, "TextDecoderContextPrefill"
             )
-            if TEST_KEEP_MLPACKAGE:
-                argmaxtools_test_utils._save_coreml_asset(
-                    self.test_coreml_model, TEST_CACHE_DIR, "TextDecoderContextPrefill", False
-                )
-    
-    def test_mlpackage(self):
-        """Generates the mlpackage for the model."""
-        with self.subTest(phase="mlpackage_generation"):
-            argmaxtools_test_utils._save_coreml_asset(
-                self.test_coreml_model, self.test_cache_dir, self.model_name, False
-            )
-
 
 argmaxtools_test_utils.TEST_DONT_PALETTIZE_TOP_K = 0
 argmaxtools_test_utils.TEST_ALLOWED_NBITS = [4, 6, 8]
@@ -394,7 +381,7 @@ def place(t):
 
 
 def main(args):
-    global TEST_WHISPER_VERSION, TEST_CACHE_DIR, TEST_DEC_KV_SEQ_LEN, TEST_TOKEN_TIMESTAMPS, TEST_LOCAL_MODEL, TEST_KEEP_MLPACKAGE
+    global TEST_WHISPER_VERSION, TEST_CACHE_DIR, TEST_DEC_KV_SEQ_LEN, TEST_TOKEN_TIMESTAMPS, TEST_LOCAL_MODEL
 
     TEST_WHISPER_VERSION = args.test_model_version
     TEST_TOKEN_TIMESTAMPS = not args.disable_token_timestamps
@@ -411,9 +398,6 @@ def main(args):
         TEST_DEC_KV_SEQ_LEN = args.test_seq_len
         test_utils.TEST_DEC_KV_SEQ_LEN = args.test_seq_len
         logger.info(f"Overriding default sequence length to {args.test_seq_len}")
-    
-    if args.keep_mlpackage:
-        TEST_KEEP_MLPACKAGE = True
 
     with argmaxtools_test_utils._get_test_cache_dir(
         args.persistent_cache_dir
@@ -425,8 +409,6 @@ def main(args):
             suite.addTest(
                 TestWhisperTextDecoder("test_torch2coreml_correctness_and_speedup")
             )
-            if args.keep_mlpackage:
-                suite.addTest(TestWhisperTextDecoder("test_mlpackage"))
         else:
             logger.info("Skipped default tests")
 
@@ -440,6 +422,8 @@ def main(args):
                     "test_palettized_torch2coreml_conversion_and_correctness"
                 )
             )
+        if args.keep_mlpackage:
+            test_utils._monkeypatch_keep_mlpackage()
 
         if os.getenv("DEBUG", False):
             suite.debug()

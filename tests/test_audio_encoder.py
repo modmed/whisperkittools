@@ -127,13 +127,6 @@ class TestWhisperAudioEncoder(
             )
             logger.info(f"torch2torch logits PSNR={psnr:.3g}")
             self.assertGreater(psnr, TEST_PSNR_THR)
-    
-    def test_mlpackage(self):
-        """Generates the mlpackage for the model."""
-        with self.subTest(phase="mlpackage_generation"):
-            argmaxtools_test_utils._save_coreml_asset(
-                self.test_coreml_model, self.test_cache_dir, self.model_name, False
-            )
 
 class TestWhisperMelSpectrogram(
     argmaxtools_test_utils.CoreMLTestsMixin, unittest.TestCase
@@ -181,13 +174,6 @@ class TestWhisperMelSpectrogram(
         cls.test_torch_output = None
 
         super().tearDownClass()
-    
-    def test_mlpackage(self):
-        """Generates the mlpackage for the model."""
-        with self.subTest(phase="mlpackage_generation"):
-            argmaxtools_test_utils._save_coreml_asset(
-                self.test_coreml_model, self.test_cache_dir, self.model_name, False
-            )
 
 
 argmaxtools_test_utils.TEST_DONT_PALETTIZE_TOP_K = 0
@@ -252,8 +238,6 @@ def main(args):
             suite.addTest(
                 TestWhisperAudioEncoder("test_torch2coreml_correctness_and_speedup")
             )
-            if args.keep_mlpackage:
-                suite.addTest(TestWhisperAudioEncoder("test_mlpackage"))
         else:
             logger.info("Skipped default tests")
 
@@ -261,8 +245,6 @@ def main(args):
             suite.addTest(
                 TestWhisperMelSpectrogram("test_torch2coreml_correctness_and_speedup")
             )
-            if args.keep_mlpackage:
-                suite.addTest(TestWhisperMelSpectrogram("test_mlpackage"))
 
         if args.palettizer_tests:
             suite.addTest(TestWhisperAudioEncoderPalettizer("test_profile_response"))
@@ -271,6 +253,8 @@ def main(args):
                     "test_palettized_torch2coreml_conversion_and_correctness"
                 )
             )
+        if args.keep_mlpackage:
+            test_utils._monkeypatch_keep_mlpackage()
 
         if os.getenv("DEBUG", False):
             suite.debug()

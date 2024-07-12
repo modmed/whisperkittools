@@ -5,12 +5,15 @@
 
 from collections import OrderedDict
 from enum import Enum
+import os
 from typing import List
 
 import coremltools as ct
 import torch
 from argmaxtools.test_utils import (AppleSiliconContextMixin,
                                     InferenceContextSpec)
+from argmaxtools.utils import get_logger
+from argmaxtools.test_utils import TEST_DEFAULT_NBITS, _compile_coreml_model
 from transformers.models.whisper import modeling_whisper
 
 
@@ -234,3 +237,27 @@ def _prepare_test_inputs_for_encoder(embed_dim,
     huggingface_transformers_inputs = dict(input_features=melspectrogram_features.squeeze(2))
 
     return argmax_inputs, huggingface_transformers_inputs
+
+# CoreML utils
+def _save_coreml_asset_keeping_mlpackage(coreml_model: ct.models.MLModel,
+                                         out_dir: str,
+                                         fname: str,
+                                         do_compile: bool = True
+                                         ) -> None:
+    logger = get_logger(__name__)
+    if TEST_DEFAULT_NBITS is not None:
+        destination = os.path.join(out_dir, f"{fname}_{TEST_DEFAULT_NBITS}-bit.mlpackage")
+    else:
+        destination = os.path.join(out_dir, f"{fname}.mlpackage")
+    logger.info(f"Saving CoreML test artifact to {destination}")
+    coreml_model.save(destination)
+    if do_compile:
+        destination = _compile_coreml_model(destination, out_dir, fname)
+        logger.info(f"Compiled model at {destination}")
+
+def _monkeypatch_keep_mlpackage():
+    logger = get_logger(__name__)
+    logger.info(f"Monkeypatching code to keep .mlpackage bundles.")
+    from argmaxtools import test_utils
+    test_utils._save_coreml_asset = _save_coreml_asset_keeping_mlpackage
+
