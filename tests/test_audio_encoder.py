@@ -128,6 +128,7 @@ class TestWhisperAudioEncoder(
             logger.info(f"torch2torch logits PSNR={psnr:.3g}")
             self.assertGreater(psnr, TEST_PSNR_THR)
 
+
 class TestWhisperMelSpectrogram(
     argmaxtools_test_utils.CoreMLTestsMixin, unittest.TestCase
 ):
@@ -204,7 +205,7 @@ class TestWhisperAudioEncoderPalettizer(
         cls.model_name = "AudioEncoder"
         cls.output_names = ["encoder_output_embeds"]
         cls.palettizer = palettize.WhisperAudioEncoderPalettizer(
-            model_version=whisperModel(),
+            model_version=TEST_WHISPER_VERSION,
             cache_dir=os.path.join(
                 TEST_CACHE_DIR, "compression_artifacts", "AudioEncoder"
             ),

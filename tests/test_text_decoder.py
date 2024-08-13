@@ -328,6 +328,7 @@ class TestWhisperTextDecoder(argmaxtools_test_utils.CoreMLTestsMixin, unittest.T
                 self.test_coreml_model, TEST_CACHE_DIR, "TextDecoderContextPrefill"
             )
 
+
 argmaxtools_test_utils.TEST_DONT_PALETTIZE_TOP_K = 0
 argmaxtools_test_utils.TEST_ALLOWED_NBITS = [4, 6, 8]
 compress.palettize.NUM_MIXED_BIT_RECIPES = 1
@@ -359,7 +360,7 @@ class TestWhisperTextDecoderPalettizer(
             cls.output_names.pop("alignment_heads_weights")
 
         cls.palettizer = palettize.WhisperTextDecoderPalettizer(
-            model_version=whisperModel(),
+            model_version=TEST_WHISPER_VERSION,
             cache_dir=os.path.join(
                 TEST_CACHE_DIR, "compression_artifacts", "TextDecoder"
             ),

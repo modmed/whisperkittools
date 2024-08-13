@@ -129,6 +129,7 @@ def cli():
     if args.generate_quantized_variants:
         logger.info("Rearranging quantized variants")
         folders_to_upload.extend(rearrange_quantized_variants(args))
+        rearrange_quantized_variants(args, extension="mlpackage")
 
     if args.upload_results:
         # Upload generated models to model repository
@@ -189,20 +190,21 @@ def upload_compression_artifacts(local_folder_path, model_version):
             path_in_repo="palettization",
             repo_type="model",
             commit_message=f"whisperkittools-{wkt_commit_hash} generated files: {model_version}",
-            ignore_patterns="**/*.mlmodelc/*"
+            ignore_patterns=["**/*.mlmodelc/*", "**/*.mlpackage/*"]
         )
     else:
         logger.warning(f"No compression artifacts found at {compression_artifacts_dir}")
 
 
-def rearrange_quantized_variants(args):
+def rearrange_quantized_variants(args, extension="mlmodelc"):
     """ Move quantized variants from nested folders into publishable structure
     """
+    suffix_length = -1 * len(f"-bit.{extension}")
     audio_encoder_variants = sorted([
-        (float(k.rsplit("_")[-1][:-13]), k) for k in
+        (float(k.rsplit("_")[-1][:suffix_length]), k) for k in
         glob.glob(os.path.join(
             args.persistent_cache_dir,
-            "compression_artifacts", "AudioEncoder", args.model_version, "*mlmodelc"))
+            "compression_artifacts", "AudioEncoder", args.model_version, f"*{extension}"))
     ], key=lambda x: x[0])
     logger.info(f"Found {len(audio_encoder_variants)} quantized variants for AudioEncoder: ")
     pprint(audio_encoder_variants)
@@ -213,10 +215,10 @@ def rearrange_quantized_variants(args):
         audio_encoder_variants = [audio_encoder_variants[0], audio_encoder_variants[-1]]
 
     text_decoder_variants = sorted([
-        (float(k.rsplit("_")[-1][:-13]), k) for k in
+        (float(k.rsplit("_")[-1][:suffix_length]), k) for k in
         glob.glob(os.path.join(
             args.persistent_cache_dir,
-            "compression_artifacts", "TextDecoder", args.model_version, "*mlmodelc"))
+            "compression_artifacts", "TextDecoder", args.model_version, f"*{extension}"))
     ], key=lambda x: x[0])
     logger.info(f"Found {len(text_decoder_variants)} quantized variants for TextDecoder: ")
     pprint(text_decoder_variants)
@@ -242,18 +244,18 @@ def rearrange_quantized_variants(args):
         os.makedirs(quantized_assets_folder, exist_ok=True)
         quantized_asset_folders.append(quantized_assets_folder)
 
-        shutil.copytree(aev[1], os.path.join(quantized_assets_folder, "AudioEncoder.mlmodelc"))
-        shutil.copytree(tdv[1], os.path.join(quantized_assets_folder, "TextDecoder.mlmodelc"))
+        shutil.copytree(aev[1], os.path.join(quantized_assets_folder, f"AudioEncoder.{extension}"))
+        shutil.copytree(tdv[1], os.path.join(quantized_assets_folder, f"TextDecoder.{extension}"))
         shutil.copytree(
-            os.path.join(args.persistent_cache_dir, "MelSpectrogram.mlmodelc"),
-            os.path.join(quantized_assets_folder, "MelSpectrogram.mlmodelc"))
+            os.path.join(args.persistent_cache_dir, f"MelSpectrogram.{extension}"),
+            os.path.join(quantized_assets_folder, f"MelSpectrogram.{extension}"))
 
         decoder_prefill_path = os.path.join(
-            args.persistent_cache_dir, "TextDecoderContextPrefill.mlmodelc")
+            args.persistent_cache_dir, f"TextDecoderContextPrefill.{extension}")
         if os.path.exists(decoder_prefill_path):
             shutil.copytree(
                 decoder_prefill_path,
-                os.path.join(quantized_assets_folder, "TextDecoderContextPrefill.mlmodelc"))
+                os.path.join(quantized_assets_folder, f"TextDecoderContextPrefill.{extension}"))
         logger.info(f"Rearranging variants: {aev[1]} & {tdv[1]}")
 
     return quantized_asset_folders
